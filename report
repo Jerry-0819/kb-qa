@@ -1,0 +1,378 @@
+# KB-QA Backend System: Official Technical Report
+
+## Table of Contents
+
+1. **Project Overview**
+2. **System Architecture Summary**
+3. **File-by-File Detailed Documentation**
+
+   * 3.1 Root-Level Files
+   * 3.2 `streamlit_app.py`
+   * 3.3 `app/core` Module
+   * 3.4 `app/api` Module
+   * 3.5 `app/schemas` Module
+   * 3.6 `app/services` Module
+   * 3.7 `app/main.py` (Application Factory)
+4. **End-to-End Flow Explanation**
+5. **Appendix: Configuration, Environment, and Logging**
+
+---
+
+# 1. Project Overview
+
+This project implements a **Retrieval-Augmented Generation (RAG)** knowledge-base chatbot using:
+
+* **FastAPI** as the backend API framework
+* **LangChain** for RAG/Agent logic
+* **FAISS** for vector search
+* **OpenAI Embeddings** + LLMs
+* **Streamlit** for UI
+* **Pydantic Settings** for configuration management
+
+The system takes internal documents, embeds them into a vector store, retrieves the most relevant chunks, and generates answers using an LLM.
+
+---
+
+# 2. System Architecture Summary
+
+### Components:
+
+1. **Index Builder** – Converts documents in `data/raw` into FAISS embeddings.
+2. **Vector Database Loader** – Loads FAISS index at FastAPI startup.
+3. **RAG Logic** – Implements retrieval + LLM chain.
+4. **Tool-Agent Logic** – Enables agent mode with retrieval tool.
+5. **FastAPI Backend** – Exposes `/api/v1/chat` endpoint.
+6. **Streamlit Frontend** – A UI that talks to backend.
+7. **Settings System** – Manages API keys, file paths, models, etc.
+8. **Logger** – Standardized, timestamped logging.
+
+---
+
+# 3. File-by-File Detailed Documentation
+
+# 3.1 Root-Level Files
+
+## **`.env`**
+
+Purpose: Stores secret keys and runtime configuration.
+
+* Loaded by Pydantic Settings.
+* Contains `OPENAI_API_KEY` and optionally model overrides.
+
+## **`requirements.txt`**
+
+Defines exact Python dependencies required for:
+
+* FastAPI
+* LangChain ecosystem
+* FAISS
+* Streamlit UI
+* Document loaders
+* .env management
+
+## **Project folders**:
+
+```
+kb-qa/
+  app/
+  data/
+    raw/     # Source PDFs, DOCX, TXT
+    index/   # FAISS index files
+  streamlit_app.py
+  requirements.txt
+  .env
+```
+
+---
+
+# 3.2 `streamlit_app.py`
+
+Purpose: Provides a user-facing chatbot UI.
+
+### Key Functions
+
+### **`call_api(query, mode, k)`**
+
+* Sends HTTP POST request to FastAPI backend.
+* Returns JSON response (`answer`, `matches`).
+
+### UI Components
+
+* Title + description
+* Mode selector (`chain` or `agent`)
+* Slider for top-k documents
+* Text area for question input
+* Button to trigger API call
+* Section to display:
+
+  * LLM answer
+  * Retrieved document snippets
+
+---
+
+# 3.3 `app/core` Module
+
+## **`config.py`**
+
+Purpose: Central configuration for the entire system.
+
+### **`class Settings(BaseSettings)`**
+
+* Loads environment variables using Pydantic Settings.
+* Defines attributes:
+
+  * `openai_api_key`
+  * embedding model
+  * chat model
+  * paths to `data/raw` and `data/index`
+* Provides a *single global config object* via:
+
+  ```python
+  settings = Settings()
+  ```
+
+## **`logger.py`**
+
+Purpose: Creates a reusable, formatted logger.
+
+### Key behavior:
+
+* Logs messages with timestamp, severity, and module name.
+* Prevents duplicate handlers.
+* Used by startup, vector loader, and error logging.
+
+## **`initialization.py`**
+
+Purpose: Code executed at FastAPI app startup.
+
+### **`lifespan(app)`**
+
+* Logs startup message.
+* Calls `load_vectorstore()` to load FAISS into memory.
+* Logs shutdown message when application closes.
+
+---
+
+# 3.4 `app/api` Module
+
+## **`endpoints.py`**
+
+Purpose: Defines API routes.
+
+### **`@router.post("/chat")`**
+
+Handles chat requests.
+
+* Accepts `ChatPayload` body.
+* Calls `run_rag()` from service layer.
+* Returns:
+
+  * LLM answer
+  * Retrieval matches
+  * Mode + model info
+
+---
+
+# 3.5 `app/schemas` Module
+
+## **`base.py`**
+
+Defines request model using Pydantic.
+
+### **`class ChatPayload(BaseModel)`**
+
+* Fields:
+
+  * `query: str`
+  * `k: int = 3`
+  * `mode: Literal["chain", "agent"]`
+* Enforces structure for `/chat` endpoint.
+
+---
+
+# 3.6 `app/services` Module
+
+This is the core logic driving retrieval and generation.
+
+## **`vector_db.py`**
+
+Purpose: Load FAISS index once; provides retrievers.
+
+### **`load_vectorstore()`**
+
+* Loads FAISS from `settings.index_dir`.
+* Uses `OpenAIEmbeddings(settings.embeddings_model)`.
+* Stores vectorstore in a module-level cache.
+
+### **`get_retriever(k)`**
+
+* Returns a LangChain retriever object.
+
+### **`similarity_with_scores(query, k)`**
+
+* Returns top-k retrieved documents with similarity scores.
+
+---
+
+## **`rag_chain.py`**
+
+Purpose: Implements the classic retrieval-augmented generation pipeline.
+
+### **`format_docs(docs)`**
+
+* Formats retrieved documents into readable context text.
+
+### **`build_rag_chain(model_name, k)`**
+
+Creates an executable LangChain pipeline:
+
+1. Retrieve top-k docs.
+2. Format them.
+3. Insert into RAG prompt template.
+4. Call LLM (ChatOpenAI).
+
+Output: `AIMessage` containing the answer.
+
+---
+
+## **`agent.py`**
+
+Purpose: Implements agent mode with retrieval tool.
+
+### **`@tool("retrieve_context")`**
+
+Defines a LangChain tool that:
+
+* Retrieves top-k documents.
+* Returns formatted context.
+
+### **`build_agent(model_name)`**
+
+* Creates a ChatOpenAI agent.
+* Injects `retrieve_context` as a tool.
+* Enables tool calls inside LLM reasoning.
+
+---
+
+## **`rag_service.py`**
+
+Purpose: Orchestrates chain mode vs agent mode.
+
+### **`format_matches(query, k)`**
+
+Returns list of dict metadata:
+
+* filename
+* page number
+* similarity score
+* snippet
+
+### **`run_rag(query, mode, k, model)`**
+
+Controls logic:
+
+* If `mode == "chain"`:
+
+  * Run RAG chain.
+* If `mode == "agent"`:
+
+  * Run tool-using agent.
+    Return: `(answer, matches)`
+
+---
+
+## **`build_index.py`**
+
+Purpose: One-time (or periodic) script to generate FAISS index.
+
+### Steps:
+
+1. Load files from `data/raw`.
+2. Parse PDFs, DOCX, TXT.
+3. Chunk text with `RecursiveCharacterTextSplitter`.
+4. Embed chunks with `OpenAIEmbeddings`.
+5. Build FAISS vectorstore.
+6. Save to `data/index/`.
+
+---
+
+# 3.7 `app/main.py`
+
+Purpose: Application factory.
+
+### **`create_app()`**
+
+* Creates FastAPI instance.
+* Injects lifespan for startup logic.
+* Mounts API router under `/api/v1`.
+
+### **`app = create_app()`**
+
+* Global app for `uvicorn`.
+
+---
+
+# 4. End-to-End Flow Explanation
+
+### **Step 1 – Document Preparation**
+
+User places documents into `data/raw`.
+
+### **Step 2 – Index Building**
+
+`build_index.py` converts raw documents → chunks → embeddings → FAISS index.
+
+### **Step 3 – FastAPI Startup**
+
+`lifespan` loads FAISS index into memory.
+
+### **Step 4 – User Query (via Streamlit)**
+
+Streamlit sends JSON:
+
+```
+{
+  "query": "What is the PTO policy?",
+  "k": 3,
+  "mode": "chain"
+}
+```
+
+### **Step 5 – RAG Execution**
+
+FastAPI → `run_rag`:
+
+* Retrieves documents (FAISS)
+* Builds prompt
+* Calls LLM
+* Returns answer + context
+
+### **Step 6 – UI Display**
+
+Streamlit renders:
+
+* Final LLM answer
+* Retrieved document snippets
+
+---
+
+# 5. Appendix: Configuration, Environment, and Logging
+
+### **Settings System**
+
+* Central hub for API key, model names, and file paths.
+* Loaded via Pydantic Settings.
+
+### **Logger**
+
+* Timestamped, formatted logs.
+* Used for FAISS load status, errors, and startup messages.
+
+### **Environment Variables**
+
+* Stored in `.env`
+* Loaded at runtime
+
+---
+
+This concludes the official technical report for your RAG Backend System. Let me know if you want a PDF version or a diagram version.

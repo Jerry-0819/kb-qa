@@ -1,0 +1,46 @@
+# =========================
+# Python / Virtual Env
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+.venv/
+env/
+
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+
+# =========================
+# RAG / Vector Index Artifacts
+# =========================
+data/index/
+*.faiss
+*.pkl
+
+# =========================
+# Logs & Temp Files
+# =========================
+*.log
+*.tmp
+
+# =========================
+# OS / Editor Noise
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Test / Coverage Artifacts
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
