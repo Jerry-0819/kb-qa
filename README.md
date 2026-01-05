@@ -1,22 +1,59 @@
-# KB-QA: Retrieval-Augmented Generation Knowledge Base System
+# 📚 KB-QA: Retrieval-Augmented Generation Knowledge Base System
 
 A modular **Retrieval-Augmented Generation (RAG)** system for answering questions over internal documents using **FAISS vector search** and **LLM-powered reasoning**. The system supports both **chain-based RAG** and **agentic RAG** workflows, exposed via a **FastAPI** backend and designed for extensibility and evaluation.
 
 ---
 
-# Features
+## 🧠 Why RAG?
 
-**Semantic retrieval** with FAISS
-**LLM-grounded answers** using retrieved context
-**Chain RAG** and **Agentic RAG** modes
-**Source attribution** with similarity scores
-**FastAPI** service layer
-Built-in **evaluation pipeline**
-Clean, modular project structure
+Large language models (LLMs) have a fixed training cutoff and may hallucinate when information is missing, outdated, or domain-specific. This limitation is especially critical for enterprises that rely on rapidly changing information such as internal policies, product specifications, regulations, and operational data.
+
+Retrieval-Augmented Generation (RAG) addresses this challenge by enabling models to retrieve and ground responses in up-to-date, user-provided sources. A RAG system can securely hold and access vast amounts of internal knowledge—including documents, databases, code repositories, and communication records—ensuring that generated answers are accurate, traceable, and context-aware.
+
+By grounding generation in retrieved documents, RAG significantly reduces hallucination and makes LLMs practical for:
+- Internal knowledge bases  
+- Enterprise Q&A systems  
+- Policy, compliance, and documentation search  
+
 
 ---
 
-## Architecture Overview
+## ✨ Features
+
+* 🔍 **Semantic retrieval** with FAISS
+* 🧠 **LLM-grounded answers** using retrieved context
+* 🔗 **Chain RAG** and **Agentic RAG** modes
+* 📄 **Source attribution** with similarity scores
+* ⚡ **FastAPI** service layer
+* 🧪 Built-in **evaluation pipeline**
+* 🗂 Clean, modular project structure
+
+---
+
+## Example Usage
+
+### 1. Chain Mode: Policy-Based Answering
+When a user asks a question, the system retrieves the most relevant content from the employee handbook given by the user and returns an answer grounded directly in the provided policy text.
+
+![Chain Mode Example](images/kb-qa_2.png)
+
+---
+
+### 2. Agent Mode: Strategy-Oriented Guidance
+In agent mode, unlike chain mode, the system does not simply copy content from the handbook. Instead, it interprets the policy and provides actionable guidance, explaining the recommended strategy and what steps the user should take in the given situation.
+
+![Agent Mode Example](images/kb-qa_3.png)
+
+---
+
+### 3. Hallucination Prevention: Unknown Questions
+If a user asks a question that cannot be answered based on the provided handbook content, the system explicitly responds that the information is not available. This design prevents hallucination and ensures that answers are only generated when supported by retrieved documents.
+
+![Unknown Question Example](images/kb-qa_4.png)
+
+---
+
+## 🏗️ Architecture Overview
 
 ```
 User Query
@@ -37,7 +74,7 @@ Grounded Answer + Sources
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 kb-qa/
@@ -65,13 +102,13 @@ kb-qa/
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
-### 1.Environment Setup
+### 1️⃣ Environment Setup
 
 ```bash
 python -m venv venv
-source venv/bin/activate 
+source venv/bin/activate     
 pip install -r requirements.txt
 ```
 
@@ -83,7 +120,7 @@ OPENAI_API_KEY=your_api_key_here
 
 ---
 
-### 2.Build the Vector Index
+### 2️⃣ Build the Vector Index
 
 ```bash
 python -m app.services.build_index
@@ -98,7 +135,7 @@ This step:
 
 ---
 
-### 3.Run the Application
+### 3️⃣ Run the Application
 
 ```bash
 uvicorn app.main:app --reload
@@ -112,7 +149,7 @@ http://127.0.0.1:8000
 
 ---
 
-## API Usage
+## 🔌 API Usage
 
 ### Query the Knowledge Base
 
@@ -140,7 +177,7 @@ POST /rag/query
 
 ---
 
-## Evaluation
+## 🧪 Evaluation
 
 Run the evaluation pipeline:
 
@@ -156,7 +193,7 @@ Supports analysis of:
 
 ---
 
-## Design Choices
+## ⚙️ Design Choices
 
 * **FAISS** for efficient local vector search
 * **Separation of concerns** between retrieval, generation, and orchestration
@@ -166,18 +203,17 @@ Supports analysis of:
 
 ---
 
-## Why RAG?
+## 📌 Future Work
 
-Large language models may hallucinate when knowledge is missing or outdated. RAG mitigates this by **grounding generation in retrieved documents**, making it suitable for:
-
-* Internal knowledge bases
-* Enterprise Q&A systems
-* Policy, compliance, and documentation search
+* Streaming responses
+* Hybrid retrieval (BM25 + vectors)
+* Reranking and caching
+* Improved citation formatting
+* Frontend UI (Streamlit / React)
 
 ---
 
-## Author
+## 👤 Author
 
 **Yanzhi (Jerry) Cui**
 Applied Mathematics, UC Berkeley
-Interests: Statistical ML, RAG systems, trustworthy AI
